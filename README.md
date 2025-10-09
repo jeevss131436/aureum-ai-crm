@@ -1,3 +1,45 @@
+Aureum CRM – AI-Powered Real Estate Assistant
+
+Aureum CRM is an AI-driven customer relationship and transaction management platform designed specifically for real estate agents. It helps agents capture leads, manage clients, and automate key transaction tasks — reducing missed follow-ups, lost deals, and administrative overhead.
+
+Key Features (Beta v0.1)
+
+Secure Authentication: Users can sign up, log in, and access a protected dashboard.
+
+Client Management: Add, view, and search clients with an intuitive interface.
+
+Transaction Tracking: Auto-generate transaction timelines and monitor key milestones (coming soon).
+
+AI Daily Digest: Personalized summaries of deadlines and tasks to keep agents on track.
+
+Modern UI: Clean, responsive white-and-gold theme built with Next.js and Tailwind CSS.
+
+Tech Stack
+
+Frontend: Next.js, React, Tailwind CSS
+
+Backend & Database: Supabase (PostgreSQL + Auth)
+
+AI Features: Google Gemini API integration (future updates)
+
+Aureum CRM streamlines lead management, client communication, and transaction tracking — giving agents more time to focus on closing deals.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
