@@ -103,7 +103,7 @@ export default function SignupPage() {
           
           <div className="space-y-6 text-white/90 max-w-md">
             <h2 className="text-3xl font-bold leading-tight">
-              Join Thousands of Successful Agents
+              Transform Your Real Estate Business
             </h2>
             <p className="text-lg text-white/80">
               Start managing your real estate business smarter with AI-powered tools designed for modern agents.
