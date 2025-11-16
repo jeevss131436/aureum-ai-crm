@@ -144,8 +144,12 @@ export async function POST(request) {
 }
 
 async function callGeminiWithTools(userId, userMessage, context, history) {
+
   const systemPrompt = buildSystemPrompt(context)
   const apiKey = process.env.GEMINI_API_KEY
+
+  console.log('API Key exists:', !!apiKey)
+  console.log('API Key first 10 chars:', apiKey?.substring(0, 10))
 
   if (!apiKey) {
     return "I'm currently unavailable. Please configure the GEMINI_API_KEY environment variable."
@@ -182,7 +186,8 @@ async function callGeminiWithTools(userId, userMessage, context, history) {
     }
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
