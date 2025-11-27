@@ -14,7 +14,10 @@ export default function TransactionsPage() {
   const router = useRouter()
 
   const [transactionForm, setTransactionForm] = useState({
-    client_id: '',
+    client_name: '',
+    client_email: '',
+    client_phone: '',
+    client_status: 'lead',
     property_address: '',
     transaction_type: 'buyer',
     contract_date: '',
@@ -90,50 +93,90 @@ export default function TransactionsPage() {
   async function handleSubmit(e) {
     e.preventDefault()
 
-    const { data: newTransaction, error: transactionError } = await supabase
-      .from('transactions')
-      .insert([{ ...transactionForm, user_id: user.id }])
-      .select()
-      .single()
+    try {
+      // First, create the client
+      const { data: clientData, error: clientError } = await supabase
+        .from('clients')
+        .insert([
+          {
+            user_id: user.id,
+            name: transactionForm.client_name,
+            email: transactionForm.client_email || null,
+            phone: transactionForm.client_phone || null,
+            status: transactionForm.client_status
+          }
+        ])
+        .select()
+        .single()
 
-    if (transactionError) {
-      alert('Error creating transaction: ' + transactionError.message)
-      return
-    }
+      if (clientError) {
+        alert('Error creating client: ' + clientError.message)
+        return
+      }
 
-    const timelineItems = generateTimeline(
-      transactionForm.contract_date,
-      transactionForm.closing_date,
-      transactionForm.transaction_type
-    )
+      // Then create the transaction with the new client_id
+      const { data: newTransaction, error: transactionError } = await supabase
+        .from('transactions')
+        .insert([
+          {
+            user_id: user.id,
+            client_id: clientData.id,
+            property_address: transactionForm.property_address,
+            transaction_type: transactionForm.transaction_type,
+            contract_date: transactionForm.contract_date,
+            closing_date: transactionForm.closing_date,
+            status: 'active'
+          }
+        ])
+        .select()
+        .single()
 
-    const { error: timelineError } = await supabase
-      .from('timeline_items')
-      .insert(
-        timelineItems.map(item => ({
-          transaction_id: newTransaction.id,
-          title: item.title,
-          description: item.description,
-          due_date: item.due_date,
-          item_order: item.item_order
-        }))
+      if (transactionError) {
+        // If transaction creation fails, delete the client we just created
+        await supabase.from('clients').delete().eq('id', clientData.id)
+        alert('Error creating transaction: ' + transactionError.message)
+        return
+      }
+
+      const timelineItems = generateTimeline(
+        transactionForm.contract_date,
+        transactionForm.closing_date,
+        transactionForm.transaction_type
       )
 
-    if (timelineError) {
-      alert('Error creating timeline: ' + timelineError.message)
-      return
-    }
+      const { error: timelineError } = await supabase
+        .from('timeline_items')
+        .insert(
+          timelineItems.map(item => ({
+            transaction_id: newTransaction.id,
+            title: item.title,
+            description: item.description,
+            due_date: item.due_date,
+            item_order: item.item_order
+          }))
+        )
 
-    fetchData(user.id)
-    setShowModal(false)
-    setTransactionForm({
-      client_id: '',
-      property_address: '',
-      transaction_type: 'buyer',
-      contract_date: '',
-      closing_date: '',
-      notes: ''
-    })
+      if (timelineError) {
+        alert('Error creating timeline: ' + timelineError.message)
+        return
+      }
+
+      fetchData(user.id)
+      setShowModal(false)
+      setTransactionForm({
+        client_name: '',
+        client_email: '',
+        client_phone: '',
+        client_status: 'lead',
+        property_address: '',
+        transaction_type: 'buyer',
+        contract_date: '',
+        closing_date: '',
+        notes: ''
+      })
+    } catch (error) {
+      alert('An error occurred: ' + error.message)
+    }
   }
 
   function handleViewTransaction(transactionId) {
@@ -187,55 +230,56 @@ export default function TransactionsPage() {
 
         {/* Navigation Links */}
         <nav className="p-4 space-y-2">
-          <button
-            onClick={() => router.push('/dashboard')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-              sidebarOpen ? 'justify-start' : 'justify-center'
-            } text-gray-600 hover:bg-gray-100 hover:text-gray-900`}
-          >
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </svg>
-            {sidebarOpen && <span>Dashboard</span>}
-          </button>
-
-          <button
-            onClick={() => router.push('/transactions')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-              sidebarOpen ? 'justify-start' : 'justify-center'
-            } bg-[#B89A5A]/10 text-[#B89A5A] font-medium`}
-          >
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-            {sidebarOpen && <span>Transactions</span>}
-          </button>
-
-          <button
-            onClick={() => router.push('/chat')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-              sidebarOpen ? 'justify-start' : 'justify-center'
-            } text-gray-600 hover:bg-gray-100 hover:text-gray-900`}
-          >
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-            </svg>
-            {sidebarOpen && <span>Navius</span>}
-          </button>
-
+           <button
+                      onClick={() => router.push('/dashboard')}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                        sidebarOpen ? 'justify-start' : 'justify-center'
+                      } bg-[#B89A5A]/10 text-[#B89A5A] font-medium`}
+                    >
+                      <Image src="/house-line.svg" alt="Aureum" width={28} height={28} className="object-contain" />
+                      {sidebarOpen && <span>Dashboard</span>}
+                    </button>
           
-
-          <button
-            onClick={() => router.push('/profile')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-              sidebarOpen ? 'justify-start' : 'justify-center'
-            } text-gray-600 hover:bg-gray-100 hover:text-gray-900`}
-          >
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            {sidebarOpen && <span>Profile</span>}
-          </button>
+                    <button
+                      onClick={() => router.push('/transactions')}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                        sidebarOpen ? 'justify-start' : 'justify-center'
+                      } text-gray-600 hover:bg-gray-100 hover:text-gray-900`}
+                    >
+                      <Image src="/clipboard-text.svg" alt="Navius" width={28} height={28} className="object-contain" />
+                      {sidebarOpen && <span>Transactions</span>}
+                    </button>
+          
+          
+                    <button
+                      onClick={() => router.push('/calendar')}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                        sidebarOpen ? 'justify-start' : 'justify-center'
+                      } text-gray-600 hover:bg-gray-100 hover:text-gray-900`}
+                    >
+                      <Image src="/calendar-dots.svg" alt="Aureum" width={28} height={28} className="object-contain" />
+                      {sidebarOpen && <span>Calendar</span>}
+                    </button>
+          
+                    <button
+                      onClick={() => router.push('/chat')}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                        sidebarOpen ? 'justify-start' : 'justify-center'
+                      } text-gray-600 hover:bg-gray-100 hover:text-gray-900`}
+                    >
+                      <Image src="/aureum-logo.png" alt="Navius" width={28} height={28} className="object-contain" />
+                      {sidebarOpen && <span>Navius</span>}
+                    </button>
+          
+                    <button
+                      onClick={() => router.push('/profile')}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                        sidebarOpen ? 'justify-start' : 'justify-center'
+                      } text-gray-600 hover:bg-gray-100 hover:text-gray-900`}
+                    >
+                      <Image src="/user-circle.svg" alt="Navius" width={28} height={28} className="object-contain" />
+                      {sidebarOpen && <span>Profile</span>}
+                    </button>
         </nav>
 
         {/* Logout Button */}
@@ -307,11 +351,6 @@ export default function TransactionsPage() {
                       {/* Left: Property Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start gap-4">
-                          <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-[#B89A5A] to-[#9B8049] flex items-center justify-center">
-                            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                            </svg>
-                          </div>
                           <div className="flex-1 min-w-0">
                             <h3 className="text-lg font-semibold text-gray-900 mb-1 truncate">
                               {transaction.property_address}
@@ -389,25 +428,110 @@ export default function TransactionsPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              {/* Client Selection */}
+              {/* Client Information Section */}
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  <h3 className="text-sm font-semibold text-blue-900">Client Information</h3>
+                </div>
+              </div>
+
+              {/* Client Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Client</label>
-                <select
-                  value={transactionForm.client_id}
-                  onChange={(e) => setTransactionForm({ ...transactionForm, client_id: e.target.value })}
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Client Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={transactionForm.client_name}
+                  onChange={(e) => setTransactionForm({ ...transactionForm, client_name: e.target.value })}
                   required
+                  placeholder="John Doe"
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#B89A5A] focus:border-[#B89A5A] outline-none transition-all"
-                >
-                  <option value="">Select a client</option>
-                  {clients.map(client => (
-                    <option key={client.id} value={client.id}>{client.name}</option>
-                  ))}
-                </select>
+                />
+              </div>
+
+              {/* Client Email and Phone */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                  <input
+                    type="email"
+                    value={transactionForm.client_email}
+                    onChange={(e) => setTransactionForm({ ...transactionForm, client_email: e.target.value })}
+                    placeholder="john@example.com"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#B89A5A] focus:border-[#B89A5A] outline-none transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                  <input
+                    type="tel"
+                    value={transactionForm.client_phone}
+                    onChange={(e) => setTransactionForm({ ...transactionForm, client_phone: e.target.value })}
+                    placeholder="(555) 123-4567"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#B89A5A] focus:border-[#B89A5A] outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Client Status */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Lead Status</label>
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setTransactionForm({ ...transactionForm, client_status: 'hot' })}
+                    className={`px-4 py-3 rounded-xl font-medium transition-all ${
+                      transactionForm.client_status === 'hot'
+                        ? 'bg-red-500 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    🔥 Hot
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTransactionForm({ ...transactionForm, client_status: 'warm' })}
+                    className={`px-4 py-3 rounded-xl font-medium transition-all ${
+                      transactionForm.client_status === 'warm'
+                        ? 'bg-yellow-500 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    ☀️ Warm
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTransactionForm({ ...transactionForm, client_status: 'lead' })}
+                    className={`px-4 py-3 rounded-xl font-medium transition-all ${
+                      transactionForm.client_status === 'lead'
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    ❄️ Cold
+                  </button>
+                </div>
+              </div>
+
+              {/* Transaction Information Section */}
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4 mt-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                  <h3 className="text-sm font-semibold text-green-900">Transaction Details</h3>
+                </div>
               </div>
 
               {/* Property Address */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Property Address</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Property Address <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   value={transactionForm.property_address}

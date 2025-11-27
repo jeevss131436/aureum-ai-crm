@@ -8,14 +8,14 @@ import Image from 'next/image'
 export default function ProfilePage() {
   const router = useRouter()
   
-  // State for user data
+  // State
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   
-  // Form state
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
@@ -23,10 +23,8 @@ export default function ProfilePage() {
     phone_number: '',
   })
   
-  // Success/error messages
   const [message, setMessage] = useState({ type: '', text: '' })
 
-  // Fetch user data on component mount
   useEffect(() => {
     fetchUserProfile()
   }, [])
@@ -35,7 +33,6 @@ export default function ProfilePage() {
     try {
       setLoading(true)
       
-      // Get current user from Supabase Auth
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
       
       if (authError) throw authError
@@ -72,7 +69,6 @@ export default function ProfilePage() {
       setSaving(true)
       setMessage({ type: '', text: '' })
   
-      // Update user metadata in Supabase Auth
       const { error: updateError } = await supabase.auth.updateUser({
         data: {
           first_name: formData.first_name,
@@ -84,7 +80,6 @@ export default function ProfilePage() {
   
       if (updateError) throw updateError
   
-      // If email changed, update auth email
       if (formData.email !== user.email) {
         const { error: emailError } = await supabase.auth.updateUser({
           email: formData.email
@@ -99,8 +94,8 @@ export default function ProfilePage() {
       }
   
       setIsEditing(false)
-      await fetchUserProfile() // Refresh data
-      
+      await fetchUserProfile()
+  
     } catch (error) {
       console.error('Error updating profile:', error)
       setMessage({ type: 'error', text: error.message || 'Failed to update profile' })
@@ -113,114 +108,237 @@ export default function ProfilePage() {
     try {
       setSaving(true)
       
-      // Note: User deletion requires admin privileges
-      // You may need to create an API route for this
-      alert('Account deletion requires contacting support. Please email support@aureum.com')
+      await supabase
+        .from('transactions')
+        .delete()
+        .eq('user_id', user.id)
       
-      // Alternatively, just sign out:
+      await supabase
+        .from('clients')
+        .delete()
+        .eq('user_id', user.id)
+      
+      const { error } = await supabase.rpc('delete_user')
+      
+      if (error) throw error
+      
       await supabase.auth.signOut()
-      router.push('/login')
+      router.push('/')
       
     } catch (error) {
       console.error('Error deleting account:', error)
-      setMessage({ type: 'error', text: 'Failed to delete account.' })
+      setMessage({ type: 'error', text: 'Failed to delete account' })
       setSaving(false)
+      setShowDeleteModal(false)
     }
+  }
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    window.location.href = '/'
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#B89A5A]"></div>
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-[#B89A5A]/20 border-t-[#B89A5A] rounded-full animate-spin"></div>
+          <p className="text-gray-600 font-medium">Loading profile...</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.back()}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <h1 className="text-xl font-semibold text-gray-800">Profile Settings</h1>
-          </div>
+    <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
+      {/* Collapsible Sidebar */}
+      <aside className={`fixed left-0 top-0 h-full bg-white border-r border-gray-200 transition-all duration-300 z-40 ${
+        sidebarOpen ? 'w-64' : 'w-20'
+      }`}>
+        {/* Logo & Toggle */}
+        <div className="h-16 border-b border-gray-200 flex items-center justify-between px-4">
+          {sidebarOpen && (
+            <div className="flex items-center gap-3">
+              <Image src="/aureum-logo.png" alt="Aureum" width={32} height={32} className="object-contain" />
+              <span style={{ fontFamily: 'Trajan Pro, serif' }} className="text-lg font-bold bg-gradient-to-r from-[#B89A5A] to-[#9B8049] bg-clip-text text-transparent">
+                AUREUM
+              </span>
+            </div>
+          )}
+          {!sidebarOpen && (
+            <Image src="/aureum-logo.png" alt="Aureum" width={32} height={32} className="object-contain mx-auto" />
+          )}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sidebarOpen ? "M11 19l-7-7 7-7m8 14l-7-7 7-7" : "M13 5l7 7-7 7M5 5l7 7-7 7"} />
+            </svg>
+          </button>
         </div>
-      </div>
+
+        {/* Navigation Links */}
+        <nav className="p-4 space-y-2">
+           <button
+                      onClick={() => router.push('/dashboard')}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                        sidebarOpen ? 'justify-start' : 'justify-center'
+                      } bg-[#B89A5A]/10 text-[#B89A5A] font-medium`}
+                    >
+                      <Image src="/house-line.svg" alt="Aureum" width={28} height={28} className="object-contain" />
+                      {sidebarOpen && <span>Dashboard</span>}
+                    </button>
+          
+                    <button
+                      onClick={() => router.push('/transactions')}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                        sidebarOpen ? 'justify-start' : 'justify-center'
+                      } text-gray-600 hover:bg-gray-100 hover:text-gray-900`}
+                    >
+                      <Image src="/clipboard-text.svg" alt="Navius" width={28} height={28} className="object-contain" />
+                      {sidebarOpen && <span>Transactions</span>}
+                    </button>
+          
+          
+                    <button
+                      onClick={() => router.push('/calendar')}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                        sidebarOpen ? 'justify-start' : 'justify-center'
+                      } text-gray-600 hover:bg-gray-100 hover:text-gray-900`}
+                    >
+                      <Image src="/calendar-dots.svg" alt="Aureum" width={28} height={28} className="object-contain" />
+                      {sidebarOpen && <span>Calendar</span>}
+                    </button>
+          
+                    <button
+                      onClick={() => router.push('/chat')}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                        sidebarOpen ? 'justify-start' : 'justify-center'
+                      } text-gray-600 hover:bg-gray-100 hover:text-gray-900`}
+                    >
+                      <Image src="/aureum-logo.png" alt="Navius" width={28} height={28} className="object-contain" />
+                      {sidebarOpen && <span>Navius</span>}
+                    </button>
+          
+                    <button
+                      onClick={() => router.push('/profile')}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                        sidebarOpen ? 'justify-start' : 'justify-center'
+                      } text-gray-600 hover:bg-gray-100 hover:text-gray-900`}
+                    >
+                      <Image src="/user-circle.svg" alt="Navius" width={28} height={28} className="object-contain" />
+                      {sidebarOpen && <span>Profile</span>}
+                    </button>
+        </nav>
+
+        {/* Logout Button */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
+          <button
+            onClick={handleLogout}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+              sidebarOpen ? 'justify-start' : 'justify-center'
+            } text-red-600 hover:bg-red-50`}
+          >
+            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            {sidebarOpen && <span>Logout</span>}
+          </button>
+        </div>
+      </aside>
 
       {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-6 py-8">
-        
-        {/* Success/Error Messages */}
-        {message.text && (
-          <div className={`mb-6 p-4 rounded-lg ${
-            message.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 
-            'bg-red-50 text-red-800 border border-red-200'
-          }`}>
-            <div className="flex items-center gap-2">
-              {message.type === 'success' ? (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-              )}
-              <span className="font-medium">{message.text}</span>
-            </div>
-          </div>
-        )}
-
-        {/* Profile Card */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          
-          {/* Profile Header with Avatar */}
-          <div className="bg-gradient-to-r from-[#B89A5A] to-[#D4B87C] px-6 py-8">
-            <div className="flex items-center gap-4">
-              <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg">
-                <span className="text-3xl font-bold text-[#B89A5A]">
-                  {formData.first_name.charAt(0)}{formData.last_name.charAt(0)}
-                </span>
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-white">
-                  {formData.first_name} {formData.last_name}
-                </h2>
-                <p className="text-white/80 text-sm mt-1">{formData.email}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Profile Information */}
-          <div className="p-6 space-y-6">
-            
-            {/* Personal Information Section */}
+      <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-20'}`}>
+        {/* Header */}
+        <div className="bg-white border-b border-gray-200 px-8 py-6">
+          <div className="flex items-center justify-between">
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">Personal Information</h3>
-                {!isEditing && (
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="px-4 py-2 text-sm font-medium text-[#B89A5A] hover:bg-[#B89A5A]/10 rounded-lg transition-colors border border-[#B89A5A]"
-                  >
-                    Edit Profile
-                  </button>
-                )}
-              </div>
+              <h1 className="text-2xl font-bold text-gray-900" style={{ fontFamily: 'Trajan Pro, serif' }}>Profile Settings</h1>
+              <p className="text-sm text-gray-600 mt-1">Manage your account information and preferences</p>
+            </div>
+            
+            {!isEditing && (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="px-6 py-2.5 bg-gradient-to-r from-[#B89A5A] to-[#9B8049] text-white rounded-xl font-medium hover:shadow-lg transition-all hover:scale-105"
+              >
+                Edit Profile
+              </button>
+            )}
+          </div>
+        </div>
 
-              <div className="space-y-4">
+        {/* Content */}
+        <div className="p-8 max-w-5xl mx-auto">
+          
+          {/* Success/Error Messages */}
+          {message.text && (
+            <div className={`mb-6 p-4 rounded-xl border-2 ${
+              message.type === 'success' 
+                ? 'bg-green-50 text-green-800 border-green-200' 
+                : 'bg-red-50 text-red-800 border-red-200'
+            }`}>
+              <div className="flex items-center gap-3">
+                {message.type === 'success' ? (
+                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                ) : (
+                  <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                )}
+                <span className="font-medium">{message.text}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Profile Card */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+            
+            {/* Profile Header */}
+            <div className="bg-gradient-to-r from-[#B89A5A] via-[#C4A965] to-[#D4B87C] px-8 py-10">
+              <div className="flex items-center gap-6">
+                <div className="w-24 h-24 bg-white rounded-2xl flex items-center justify-center shadow-xl">
+                  <span className="text-4xl font-bold text-[#B89A5A]" style={{ fontFamily: 'Trajan Pro, serif' }}>
+                    {formData.first_name.charAt(0)}{formData.last_name.charAt(0)}
+                  </span>
+                </div>
+                <div>
+                  <h2 className="text-3xl font-bold text-white" style={{ fontFamily: 'Trajan Pro, serif' }}>
+                    {formData.first_name} {formData.last_name}
+                  </h2>
+                  <p className="text-white/90 text-base mt-2 flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    {formData.email}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Form Section */}
+            <div className="p-8">
+              <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <div className="w-8 h-8 bg-[#B89A5A]/10 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-[#B89A5A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                Personal Information
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* First Name */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    First Name
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    First Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -228,7 +346,7 @@ export default function ProfilePage() {
                     value={formData.first_name}
                     onChange={handleInputChange}
                     disabled={!isEditing}
-                    className={`w-full px-4 py-2 border rounded-lg transition-colors ${
+                    className={`w-full px-4 py-3 border rounded-xl transition-all ${
                       isEditing 
                         ? 'border-gray-300 focus:border-[#B89A5A] focus:ring-2 focus:ring-[#B89A5A]/20 bg-white' 
                         : 'border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed'
@@ -238,8 +356,8 @@ export default function ProfilePage() {
 
                 {/* Last Name */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Last Name
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Last Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -247,7 +365,7 @@ export default function ProfilePage() {
                     value={formData.last_name}
                     onChange={handleInputChange}
                     disabled={!isEditing}
-                    className={`w-full px-4 py-2 border rounded-lg transition-colors ${
+                    className={`w-full px-4 py-3 border rounded-xl transition-all ${
                       isEditing 
                         ? 'border-gray-300 focus:border-[#B89A5A] focus:ring-2 focus:ring-[#B89A5A]/20 bg-white' 
                         : 'border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed'
@@ -257,8 +375,8 @@ export default function ProfilePage() {
 
                 {/* Email */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email Address
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Email Address <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="email"
@@ -266,22 +384,25 @@ export default function ProfilePage() {
                     value={formData.email}
                     onChange={handleInputChange}
                     disabled={!isEditing}
-                    className={`w-full px-4 py-2 border rounded-lg transition-colors ${
+                    className={`w-full px-4 py-3 border rounded-xl transition-all ${
                       isEditing 
                         ? 'border-gray-300 focus:border-[#B89A5A] focus:ring-2 focus:ring-[#B89A5A]/20 bg-white' 
                         : 'border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed'
                     } outline-none`}
                   />
                   {isEditing && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Changing your email will require verification
+                    <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                      Changing email requires verification
                     </p>
                   )}
                 </div>
 
-                {/* Phone Number */}
+                {/* Phone */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Phone Number
                   </label>
                   <input
@@ -291,7 +412,7 @@ export default function ProfilePage() {
                     onChange={handleInputChange}
                     disabled={!isEditing}
                     placeholder="+1 (555) 000-0000"
-                    className={`w-full px-4 py-2 border rounded-lg transition-colors ${
+                    className={`w-full px-4 py-3 border rounded-xl transition-all ${
                       isEditing 
                         ? 'border-gray-300 focus:border-[#B89A5A] focus:ring-2 focus:ring-[#B89A5A]/20 bg-white' 
                         : 'border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed'
@@ -300,45 +421,62 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* Action Buttons (shown when editing) */}
+              {/* Action Buttons */}
               {isEditing && (
-                <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
-                  <button
-                    onClick={handleSaveChanges}
-                    disabled={saving}
-                    className="flex-1 bg-[#B89A5A] text-white px-6 py-2.5 rounded-lg font-medium hover:bg-[#A68949] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {saving ? 'Saving...' : 'Save Changes'}
-                  </button>
+                <div className="flex gap-4 mt-8 pt-6 border-t border-gray-200">
                   <button
                     onClick={() => {
                       setIsEditing(false)
-                      fetchUserProfile() // Reset to original data
+                      fetchUserProfile()
                       setMessage({ type: '', text: '' })
                     }}
                     disabled={saving}
-                    className="flex-1 bg-gray-100 text-gray-700 px-6 py-2.5 rounded-lg font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
+                    className="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-all disabled:opacity-50"
                   >
                     Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveChanges}
+                    disabled={saving}
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-[#B89A5A] to-[#9B8049] text-white rounded-xl font-semibold hover:shadow-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+                  >
+                    {saving ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        Saving...
+                      </span>
+                    ) : 'Save Changes'}
                   </button>
                 </div>
               )}
             </div>
           </div>
-        </div>
 
-        {/* Account Management Card */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mt-6 overflow-hidden">
-          <div className="p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Account Management</h3>
-            
-            <div className="space-y-4">
+          {/* Account Management */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+            <div className="p-8">
+              <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
+                Account Security
+              </h3>
+              
               {/* Change Password */}
-              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="p-5 bg-blue-50 rounded-xl border-2 border-blue-100 mb-4">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium text-gray-800">Password</h4>
-                    <p className="text-sm text-gray-600 mt-1">Update your password to keep your account secure</p>
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900">Password</h4>
+                      <p className="text-sm text-gray-600 mt-1">Keep your account secure with a strong password</p>
+                    </div>
                   </div>
                   <button
                     onClick={async () => {
@@ -347,12 +485,12 @@ export default function ProfilePage() {
                           redirectTo: `${window.location.origin}/reset-password`,
                         })
                         if (error) throw error
-                        setMessage({ type: 'success', text: 'Password reset email sent!' })
+                        setMessage({ type: 'success', text: 'Password reset email sent to your inbox!' })
                       } catch (error) {
                         setMessage({ type: 'error', text: 'Failed to send reset email' })
                       }
                     }}
-                    className="px-4 py-2 text-sm font-medium text-[#B89A5A] hover:bg-[#B89A5A]/10 rounded-lg transition-colors border border-[#B89A5A]"
+                    className="px-5 py-2.5 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-all hover:shadow-lg"
                   >
                     Change Password
                   </button>
@@ -360,15 +498,22 @@ export default function ProfilePage() {
               </div>
 
               {/* Delete Account */}
-              <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+              <div className="p-5 bg-red-50 rounded-xl border-2 border-red-200">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium text-red-800">Delete Account</h4>
-                    <p className="text-sm text-red-600 mt-1">Permanently delete your account and all data</p>
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-red-900">Delete Account</h4>
+                      <p className="text-sm text-red-700 mt-1">Permanently delete your account and all data</p>
+                    </div>
                   </div>
                   <button
                     onClick={() => setShowDeleteModal(true)}
-                    className="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-100 rounded-lg transition-colors border border-red-300"
+                    className="px-5 py-2.5 bg-red-600 text-white rounded-xl font-medium hover:bg-red-700 transition-all hover:shadow-lg"
                   >
                     Delete Account
                   </button>
@@ -376,57 +521,89 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Account Created Date */}
-        <div className="mt-6 text-center text-sm text-gray-500">
-          Account created on {new Date(user?.created_at).toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })}
+          {/* Account Info Footer */}
+          <div className="text-center">
+            <p className="text-sm text-gray-500 flex items-center justify-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Account created {new Date(user?.created_at).toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </p>
+          </div>
         </div>
-      </div>
+      </main>
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 scale-100 animate-[scale-in_0.2s_ease-out]">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-14 h-14 bg-red-100 rounded-2xl flex items-center justify-center">
+                <svg className="w-7 h-7 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-gray-900">Delete Account</h3>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Delete Account?</h3>
+                <p className="text-sm text-gray-500">This action cannot be undone</p>
+              </div>
             </div>
             
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to delete your account? This action cannot be undone and will permanently delete:
+            <p className="text-gray-700 mb-4 font-medium">
+              This will permanently delete:
             </p>
             
-            <ul className="text-sm text-gray-600 space-y-2 mb-6 ml-4 list-disc">
-              <li>Your profile information</li>
-              <li>All transactions and timeline data</li>
-              <li>All clients and leads</li>
-              <li>Chat history</li>
-              <li>All briefings and notifications</li>
+            <ul className="text-sm text-gray-600 space-y-2 mb-6 bg-gray-50 rounded-xl p-4 border border-gray-200">
+              <li className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                Your profile information
+              </li>
+              <li className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                All transactions and timelines
+              </li>
+              <li className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                All clients and leads
+              </li>
+              <li className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                All chat history and briefings
+              </li>
             </ul>
 
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteModal(false)}
                 disabled={saving}
-                className="flex-1 bg-gray-100 text-gray-700 px-6 py-2.5 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                className="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-all"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteAccount}
                 disabled={saving}
-                className="flex-1 bg-red-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
+                className="flex-1 px-6 py-3 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-all hover:shadow-xl disabled:opacity-50"
               >
-                {saving ? 'Deleting...' : 'Delete Forever'}
+                {saving ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Deleting...
+                  </span>
+                ) : 'Delete Forever'}
               </button>
             </div>
           </div>

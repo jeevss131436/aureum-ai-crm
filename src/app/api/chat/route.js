@@ -1,105 +1,206 @@
-// app/api/chat/route.js - Working Gemini AI Agent with Function Calling
+// app/api/chat/route.js - Complete OpenAI Version with All Features
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import OpenAI from 'openai'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
-const CONVERSATION_LIMIT = 10
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+})
 
-// Tool definitions in Gemini's format
+const CONVERSATION_LIMIT = 5
+
+// Comprehensive tool definitions
 const TOOLS = [
   {
-    function_declarations: [
-      {
-        name: "send_email_briefing",
-        description: "Sends an email briefing with today's and tomorrow's deadlines to the user",
-        parameters: {
-          type: "object",
-          properties: {},
-          required: []
-        }
-      },
-      {
-        name: "send_sms_briefing",
-        description: "Sends an SMS text message briefing to the user's phone",
-        parameters: {
-          type: "object",
-          properties: {},
-          required: []
-        }
-      },
-      {
-        name: "create_transaction",
-        description: "Creates a new real estate transaction for a client. The contract date will be set to today.",
-        parameters: {
-          type: "object",
-          properties: {
-            client_name: {
-              type: "string",
-              description: "Name of the client for this transaction"
-            },
-            property_address: {
-              type: "string",
-              description: "Full address of the property"
-            },
-            transaction_type: {
-              type: "string",
-              enum: ["buyer", "seller"],
-              description: "Whether this is a buyer or seller transaction"
-            },
-            closing_date: {
-              type: "string",
-              description: "Expected closing date in YYYY-MM-DD format"
-            }
-          },
-          required: ["client_name", "property_address", "transaction_type", "closing_date"]
-        }
-      },
-      {
-        name: "add_client",
-        description: "Adds a new client to the CRM",
-        parameters: {
-          type: "object",
-          properties: {
-            name: {
-              type: "string",
-              description: "Client's full name"
-            },
-            email: {
-              type: "string",
-              description: "Client's email address"
-            },
-            phone: {
-              type: "string",
-              description: "Client's phone number"
-            },
-            status: {
-              type: "string",
-              enum: ["hot", "warm", "cold"],
-              description: "Client's lead status"
-            }
-          },
-          required: ["name", "status"]
-        }
-      },
-      {
-        name: "mark_deadline_complete",
-        description: "Marks a deadline/task as completed",
-        parameters: {
-          type: "object",
-          properties: {
-            deadline_title: {
-              type: "string",
-              description: "The title of the deadline to mark complete"
-            }
-          },
-          required: ["deadline_title"]
-        }
+    type: "function",
+    function: {
+      name: "send_email_briefing",
+      description: "Sends an email briefing with today's and tomorrow's deadlines to the user",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: []
       }
-    ]
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "send_sms_briefing",
+      description: "Sends an SMS text message briefing to the user's phone",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: []
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_transaction",
+      description: "Creates a new real estate transaction for a client. The contract date will be set to today.",
+      parameters: {
+        type: "object",
+        properties: {
+          client_name: {
+            type: "string",
+            description: "Name of the client for this transaction"
+          },
+          property_address: {
+            type: "string",
+            description: "Full address of the property"
+          },
+          transaction_type: {
+            type: "string",
+            enum: ["buyer", "seller"],
+            description: "Whether this is a buyer or seller transaction"
+          },
+          closing_date: {
+            type: "string",
+            description: "Expected closing date in YYYY-MM-DD format"
+          }
+        },
+        required: ["client_name", "property_address", "transaction_type", "closing_date"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "add_client",
+      description: "Adds a new client to the CRM system",
+      parameters: {
+        type: "object",
+        properties: {
+          name: {
+            type: "string",
+            description: "Client's full name"
+          },
+          email: {
+            type: "string",
+            description: "Client's email address"
+          },
+          phone: {
+            type: "string",
+            description: "Client's phone number"
+          },
+          status: {
+            type: "string",
+            enum: ["hot", "warm", "cold"],
+            description: "Client's lead status (hot=ready to buy/sell, warm=interested, cold=just browsing)"
+          }
+        },
+        required: ["name", "status"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_client_status",
+      description: "Updates a client's lead status (hot/warm/cold)",
+      parameters: {
+        type: "object",
+        properties: {
+          client_name: {
+            type: "string",
+            description: "Name of the client to update"
+          },
+          new_status: {
+            type: "string",
+            enum: ["hot", "warm", "cold"],
+            description: "New status for the client"
+          }
+        },
+        required: ["client_name", "new_status"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_client",
+      description: "Deletes a client from the CRM",
+      parameters: {
+        type: "object",
+        properties: {
+          client_name: {
+            type: "string",
+            description: "Name of the client to delete"
+          }
+        },
+        required: ["client_name"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "mark_deadline_complete",
+      description: "Marks a deadline/task as completed",
+      parameters: {
+        type: "object",
+        properties: {
+          deadline_title: {
+            type: "string",
+            description: "The title of the deadline to mark complete"
+          }
+        },
+        required: ["deadline_title"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "set_briefing_schedule",
+      description: "Sets up automated email briefings at a specific time. User can choose daily or weekly frequency.",
+      parameters: {
+        type: "object",
+        properties: {
+          frequency: {
+            type: "string",
+            enum: ["daily", "weekly"],
+            description: "How often to send briefings"
+          },
+          time: {
+            type: "string",
+            description: "Time to send briefing in HH:MM format (24-hour, e.g., '06:00' for 6 AM)"
+          },
+          day_of_week: {
+            type: "number",
+            description: "For weekly: day of week (0=Sunday, 1=Monday, etc.). Not needed for daily.",
+            minimum: 0,
+            maximum: 6
+          }
+        },
+        required: ["frequency", "time"]
+      }
+    }
+  }
+  ,
+  {
+    type: "function",
+    function: {
+      name: "generate_client_brief",
+      description: "Generates a personalized brief for a specific client",
+      parameters: {
+        type: "object",
+        properties: {
+          client_name: {
+            type: "string",
+            description: "Name of the client"
+          }
+        },
+        required: ["client_name"]
+      }
+    }
   }
 ]
 
@@ -114,20 +215,14 @@ export async function POST(request) {
       }, { status: 400 })
     }
 
-    // Save user message
-    await saveMessageToHistory(userId, 'user', message)
-    
     // Get context and history
     const [context, history] = await Promise.all([
       getUserContext(userId),
       getConversationHistory(userId)
     ])
 
-    // Call Gemini with function calling
-    const response = await callGeminiWithTools(userId, message, context, history)
-
-    // Save assistant response
-    await saveMessageToHistory(userId, 'assistant', response)
+    // Call OpenAI with tools
+    const response = await callOpenAIWithTools(userId, message, context, history)
 
     return NextResponse.json({ 
       success: true, 
@@ -143,29 +238,22 @@ export async function POST(request) {
   }
 }
 
-async function callGeminiWithTools(userId, userMessage, context, history) {
-
+async function callOpenAIWithTools(userId, userMessage, context, history) {
   const systemPrompt = buildSystemPrompt(context)
-  const apiKey = process.env.GEMINI_API_KEY
 
-  console.log('API Key exists:', !!apiKey)
-  console.log('API Key first 10 chars:', apiKey?.substring(0, 10))
-
-  if (!apiKey) {
-    return "I'm currently unavailable. Please configure the GEMINI_API_KEY environment variable."
+  if (!process.env.OPENAI_API_KEY) {
+    return "I'm currently unavailable. Please configure the OPENAI_API_KEY environment variable."
   }
 
-  // Format conversation history for Gemini
-  const contents = history.map(msg => ({
-    role: msg.role === 'user' ? 'user' : 'model',
-    parts: [{ text: msg.message }]
-  }))
-
-  // Add current user message
-  contents.push({
-    role: 'user',
-    parts: [{ text: userMessage }]
-  })
+  // Format conversation history
+  const messages = [
+    { role: "system", content: systemPrompt },
+    ...history.map(msg => ({
+      role: msg.role === 'user' ? 'user' : 'assistant',
+      content: msg.message
+    })),
+    { role: "user", content: userMessage }
+  ]
 
   let attempts = 0
   const maxAttempts = 5
@@ -173,80 +261,55 @@ async function callGeminiWithTools(userId, userMessage, context, history) {
   while (attempts < maxAttempts) {
     attempts++
 
-    const payload = {
-      contents: contents,
-      systemInstruction: {
-        parts: [{ text: systemPrompt }]
-      },
-      tools: TOOLS,
-      generationConfig: {
+    try {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: messages,
+        tools: TOOLS,
+        tool_choice: "auto",
         temperature: 0.7,
-        maxOutputTokens: 1024
-      }
-    }
-
-    const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
-
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      }
-    )
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      console.error('Gemini API error:', errorData)
-      return `I encountered an error: ${errorData.error?.message || 'Unknown error'}`
-    }
-
-    const data = await response.json()
-    const candidate = data.candidates?.[0]
-    const parts = candidate?.content?.parts || []
-
-    // Check for function calls
-    const functionCall = parts.find(part => part.functionCall)
-
-    if (functionCall) {
-      console.log('Function call detected:', functionCall.functionCall)
-
-      // Execute the function
-      const toolResult = await executeToolCall(
-        userId, 
-        functionCall.functionCall.name, 
-        functionCall.functionCall.args || {}
-      )
-
-      // Add model's function call to history
-      contents.push({
-        role: 'model',
-        parts: [{ functionCall: functionCall.functionCall }]
+        max_tokens: 1500
       })
 
-      // Add function response to history
-      contents.push({
-        role: 'function',
-        parts: [{
-          functionResponse: {
-            name: functionCall.functionCall.name,
-            response: toolResult
-          }
-        }]
-      })
+      const responseMessage = completion.choices[0].message
 
-      // Continue loop to get final text response
-      continue
+      // Check for function calls
+      if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
+        const toolCall = responseMessage.tool_calls[0]
+        console.log('Function call detected:', toolCall.function.name)
+
+        // Execute the function
+        const functionArgs = JSON.parse(toolCall.function.arguments)
+        const toolResult = await executeToolCall(
+          userId,
+          toolCall.function.name,
+          functionArgs
+        )
+
+        // Add assistant's function call to messages
+        messages.push(responseMessage)
+
+        // Add function result to messages
+        messages.push({
+          role: "tool",
+          tool_call_id: toolCall.id,
+          content: JSON.stringify(toolResult)
+        })
+
+        // Continue loop to get final text response
+        continue
+      }
+
+      // No function call - return text response
+      return responseMessage.content || "I processed your request but couldn't generate a response."
+
+    } catch (error) {
+      console.error('OpenAI API error:', error)
+      if (error.code === 'insufficient_quota') {
+        return "I've run out of API quota. Please add credits to your OpenAI account."
+      }
+      throw error
     }
-
-    // No function call - return text response
-    const textPart = parts.find(part => part.text)
-    if (textPart) {
-      return textPart.text
-    }
-
-    // Fallback
-    return "I processed your request but couldn't generate a response."
   }
 
   return "I tried multiple times but couldn't complete your request. Please try rephrasing."
@@ -267,7 +330,7 @@ async function executeToolCall(userId, toolName, args) {
           const emailData = await emailResponse.json()
           return { 
             success: emailData.success, 
-            message: emailData.success ? 'Email briefing sent successfully' : emailData.error 
+            message: emailData.success ? 'Email briefing sent successfully! Check your inbox.' : emailData.error 
           }
         } catch (error) {
           return { success: false, message: `Failed to send email: ${error.message}` }
@@ -283,13 +346,14 @@ async function executeToolCall(userId, toolName, args) {
           const smsData = await smsResponse.json()
           return { 
             success: smsData.success, 
-            message: smsData.success ? 'SMS briefing sent successfully' : smsData.error 
+            message: smsData.success ? 'SMS briefing sent successfully! Check your phone.' : smsData.error 
           }
         } catch (error) {
           return { success: false, message: `Failed to send SMS: ${error.message}` }
         }
 
       case 'create_transaction':
+        // Find or create client
         const { data: existingClient } = await supabase
           .from('clients')
           .select('id')
@@ -344,7 +408,7 @@ async function executeToolCall(userId, toolName, args) {
         return { 
           success: true, 
           transaction_id: transaction.id, 
-          message: `Transaction created for ${args.client_name} at ${args.property_address}` 
+          message: `✅ Transaction created for ${args.client_name} at ${args.property_address}. Timeline with ${timeline.length} milestones has been set up.` 
         }
 
       case 'add_client':
@@ -364,7 +428,55 @@ async function executeToolCall(userId, toolName, args) {
         return { 
           success: true, 
           client_id: client.id, 
-          message: `Client ${args.name} added successfully` 
+          message: `✅ Client "${args.name}" added successfully as a ${args.status} lead!` 
+        }
+
+      case 'update_client_status':
+        const { data: clientToUpdate } = await supabase
+          .from('clients')
+          .select('id')
+          .eq('user_id', userId)
+          .ilike('name', args.client_name)
+          .single()
+
+        if (!clientToUpdate) {
+          return { success: false, message: `Client "${args.client_name}" not found` }
+        }
+
+        const { error: updateError } = await supabase
+          .from('clients')
+          .update({ status: args.new_status })
+          .eq('id', clientToUpdate.id)
+
+        if (updateError) throw updateError
+
+        return { 
+          success: true, 
+          message: `✅ Updated "${args.client_name}" to ${args.new_status} status` 
+        }
+
+      case 'delete_client':
+        const { data: clientToDelete } = await supabase
+          .from('clients')
+          .select('id')
+          .eq('user_id', userId)
+          .ilike('name', args.client_name)
+          .single()
+
+        if (!clientToDelete) {
+          return { success: false, message: `Client "${args.client_name}" not found` }
+        }
+
+        const { error: deleteError } = await supabase
+          .from('clients')
+          .delete()
+          .eq('id', clientToDelete.id)
+
+        if (deleteError) throw deleteError
+
+        return { 
+          success: true, 
+          message: `✅ Client "${args.client_name}" has been deleted` 
         }
 
       case 'mark_deadline_complete':
@@ -379,7 +491,7 @@ async function executeToolCall(userId, toolName, args) {
           .limit(1)
 
         if (!deadlines || deadlines.length === 0) {
-          return { success: false, message: 'Deadline not found' }
+          return { success: false, message: `Deadline "${args.deadline_title}" not found` }
         }
 
         const { error: updateErr } = await supabase
@@ -390,8 +502,40 @@ async function executeToolCall(userId, toolName, args) {
         if (updateErr) throw updateErr
         return { 
           success: true, 
-          message: `Marked "${deadlines[0].title}" as complete` 
+          message: `✅ Marked "${deadlines[0].title}" as complete!` 
         }
+
+      case 'set_briefing_schedule':
+        const scheduleData = {
+          email_enabled: true,
+          email_frequency: args.frequency,
+          email_time: args.time,
+          email_day: args.day_of_week || 1,
+          timezone: 'America/New_York' // You can make this dynamic later
+        }
+
+        const { error: scheduleError } = await supabase.auth.admin.updateUserById(
+          userId,
+          {
+            user_metadata: {
+              briefing_preferences: scheduleData
+            }
+          }
+        )
+
+        if (scheduleError) throw scheduleError
+
+        const scheduleText = args.frequency === 'daily' 
+          ? `every day at ${args.time}` 
+          : `every ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][args.day_of_week || 1]} at ${args.time}`
+
+        return { 
+          success: true, 
+          message: `✅ Briefing schedule set! You'll receive automated email briefings ${scheduleText}.` 
+        }
+
+      case 'generate_client_brief':
+        return await generateClientBrief(userId, args)
 
       default:
         return { success: false, message: `Unknown tool: ${toolName}` }
@@ -425,14 +569,6 @@ function generateTimeline(contractDate, closingDate) {
       due_date: dueDate.toISOString().split('T')[0]
     }
   })
-}
-
-async function saveMessageToHistory(userId, role, message) {
-  const { error } = await supabase
-    .from('chat_history')
-    .insert({ user_id: userId, role, message })
-    
-  if (error) console.error('Error saving message:', error)
 }
 
 async function getConversationHistory(userId) {
@@ -512,30 +648,27 @@ function buildSystemPrompt(context) {
 
 ## YOUR CAPABILITIES
 
-### 1. TAKE ACTIONS (Use your tools when appropriate)
-- Send email/SMS briefings about deadlines
-- Create new transactions with automatic timeline generation
-- Add new clients to the CRM
-- Mark tasks/deadlines as complete
-- When a user asks you to DO something, USE YOUR TOOLS immediately
+### 1. TAKE ACTIONS (Use your tools proactively!)
+When users ask you to DO something, USE YOUR TOOLS immediately:
+- **Send briefings**: email or SMS with deadlines and priorities
+- **Manage clients**: add new clients, update their status (hot/warm/cold), or delete them
+- **Create transactions**: set up new deals with automatic timeline generation
+- **Mark tasks complete**: check off completed deadlines
+- **Schedule briefings**: set up automated daily/weekly email briefings at specific times
 
 ### 2. PROVIDE EXPERT REAL ESTATE ADVICE
 You are deeply knowledgeable about:
 - **Sales & Negotiation**: Closing techniques, objection handling, pricing strategies, competitive market analysis
-- **Lead Generation**: Prospecting methods, sphere of influence, networking, digital marketing, cold calling scripts
+- **Lead Generation**: Prospecting methods, sphere of influence, networking, digital marketing, cold calling
 - **Client Management**: Building rapport, understanding buyer/seller psychology, managing expectations
-- **Transaction Process**: Contract details, inspection contingencies, financing options, title/escrow process
+- **Transaction Process**: Contract details, inspection contingencies, financing options, title/escrow
 - **Market Knowledge**: Understanding market cycles, reading CMAs, pricing strategies, investment analysis
 - **Legal/Compliance**: Disclosure requirements, fair housing laws, agency relationships, ethics
 - **Marketing**: Listing presentations, open houses, staging advice, social media strategies
 - **Business Development**: Building a brand, time management, building a team, scaling operations
 
 ### 3. ANALYZE USER'S BUSINESS
-Review their current situation and provide strategic insights:
-- Identify opportunities in their pipeline
-- Suggest next actions for stale leads
-- Warn about upcoming deadlines
-- Recommend business improvements
+Review their data and provide strategic insights about opportunities, risks, and next actions.
 
 ## USER'S CURRENT BUSINESS DATA
 
@@ -548,39 +681,168 @@ ${deadlinesList}
 Recent Clients:
 ${clientsList}
 
-## RESPONSE FORMATTING
+## RESPONSE STYLE
 
-**Use Markdown formatting for better readability:**
-- Use **bold** for emphasis on key points
-- Use bullet points for lists
-- Use numbered lists for step-by-step instructions
-- Keep paragraphs short (2-3 sentences max)
-- Use line breaks between sections
+- **Be proactive**: If you see they have urgent deadlines, suggest sending a briefing
+- **Be specific**: Reference actual properties, clients, and dates from their data
+- **Use markdown**: Bold key points, use bullet lists for clarity
+- **Be encouraging**: You're their business partner helping them succeed
+- **Take action**: When they ask you to DO something, use your tools immediately - don't just explain how
 
-**For Questions (What/How/Why/Explain):**
-- Start with a direct answer
-- Provide clear, actionable advice
-- Use real estate examples
-- Include specific strategies when helpful
-- Keep responses focused and scannable
+Examples:
+❌ "You can add a client by going to the clients page"
+✅ "I'll add Sarah Johnson as a hot lead right now!" [uses add_client tool]
 
-**For Action Requests (Send/Create/Add/Mark):**
-- Use your tools immediately
-- Confirm what you did in 1-2 sentences
-- Be clear and concise
+❌ "You should set up briefings"
+✅ "Want me to set up daily email briefings at 6 AM? Just say yes!" [ready to use set_briefing_schedule]
 
-**For Business Analysis:**
-- Use bullet points
-- Be specific with property addresses and client names
-- Prioritize by urgency
+Be concise, action-oriented, and genuinely helpful!`
+}
 
-**Tone:** Professional yet conversational, like a trusted advisor. Be confident, practical, and encouraging.
+async function generateClientBrief(userId, args) {
+  const { client_name } = args
 
-**Length:** 
-- General questions: 2-4 short paragraphs
-- How-to guides: Numbered lists with brief explanations
-- Action confirmations: 1-2 sentences
-- Business reviews: Concise bullet points
+  try {
+    // 1. Find the client
+    const { data: client, error: clientError } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('user_id', userId)
+      .ilike('name', `%${client_name}%`)
+      .single()
 
-Remember: Format responses for easy scanning. Use whitespace and markdown to improve readability.`
+    if (clientError || !client) {
+      return { 
+        success: false,
+        message: `I couldn't find a client named "${client_name}". Please check the spelling or try a different name.` 
+      }
+    }
+
+    // 2. Check if cached brief is fresh (< 24 hours)
+    if (client.brief_content && client.brief_generated_at) {
+      const briefAge = Date.now() - new Date(client.brief_generated_at).getTime()
+      const twentyFourHours = 24 * 60 * 60 * 1000
+      
+      if (briefAge < twentyFourHours) {
+        return {
+          success: true,
+          message: `Here's the brief for **${client.name}**:\n\n${client.brief_content}\n\n*(Generated ${new Date(client.brief_generated_at).toLocaleString()})*`
+        }
+      }
+    }
+
+    // 3. Gather data for brief
+    const [
+      { data: keyNotes },
+      { data: unreadMessages },
+      { data: recentConversations },
+      { data: activeTransactions }
+    ] = await Promise.all([
+      supabase
+        .from('client_notes')
+        .select('note')
+        .eq('client_id', client.id)
+        .eq('is_key_note', true),
+      
+      supabase
+        .from('client_messages')
+        .select('*')
+        .eq('client_id', client.id)
+        .eq('is_read', false),
+      
+      supabase
+        .from('conversation_summaries')
+        .select('*')
+        .eq('client_id', client.id)
+        .order('conversation_date', { ascending: false })
+        .limit(1),
+      
+      supabase
+        .from('transactions')
+        .select('property_address, status')
+        .eq('client_id', client.id)
+        .eq('status', 'active')
+    ])
+
+    // 4. Build engagement description
+    let engagementPattern = "Engagement pattern unknown"
+    if (client.avg_response_time) {
+      if (client.avg_response_time < 180) {
+        engagementPattern = "responds quickly, typically within a couple hours"
+      } else if (client.avg_response_time < 1440) {
+        engagementPattern = "responds within a day"
+      } else {
+        engagementPattern = "takes several days to respond"
+      }
+    }
+
+    // 5. Build property details
+    const propertyDetails = client.property_preferences 
+      ? `${client.property_preferences.type || 'property'} in ${client.property_preferences.location || 'the area'}${
+          client.property_preferences.budget_min 
+            ? ` ($${(client.property_preferences.budget_min / 1000)}k-$${(client.property_preferences.budget_max / 1000)}k budget)`
+            : ''
+        }`
+      : "property details not yet specified"
+
+    const lastConvo = recentConversations?.[0]?.summary || "no recent conversations recorded"
+    const unopenedMsg = unreadMessages?.length > 0 
+      ? `You have ${unreadMessages.length} unopened message(s) from them. `
+      : ""
+    const keyNotesText = keyNotes?.length > 0 
+      ? keyNotes.map(n => n.note).join('; ') 
+      : ""
+    const contactPrefs = client.contact_preferences?.preferred_times?.join(', ') || "not set"
+
+    // 6. Generate AI brief
+    const prompt = `Write a concise, professional client brief (80-120 words) for a real estate agent about their client.
+
+CLIENT INFO:
+- Name: ${client.name}
+- Type: ${client.lead_type || 'buyer'}
+- Status: ${client.status} lead
+- AI Ranking: ${client.ai_ranking || 'medium'}
+- Looking for: ${propertyDetails}
+- Engagement: ${engagementPattern}
+- Unopened messages: ${unreadMessages?.length || 0}
+- Last conversation: ${lastConvo}
+- Key notes: ${keyNotesText || 'none'}
+- Contact preferences: ${contactPrefs}
+- Active transactions: ${activeTransactions?.length || 0}
+
+Format exactly like this:
+"${client.name} is a ${client.status}, ${client.ai_ranking || 'medium'}-ranking ${client.lead_type || 'buyer'} interested in ${propertyDetails}. ${client.name} ${engagementPattern}. ${unopenedMsg}Your last conversation involved ${lastConvo}. ${keyNotesText ? keyNotesText + '. ' : ''}${contactPrefs !== 'not set' ? 'Prefers contact during ' + contactPrefs + '. ' : ''}Overall momentum is [assess as strong/steady/slowing]; [recommend specific next action]."
+
+Be specific. Use natural language. Sound professional but warm.`
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.7,
+      max_tokens: 250
+    })
+
+    const generatedBrief = completion.choices[0].message.content
+
+    // 7. Cache the brief
+    await supabase
+      .from('clients')
+      .update({
+        brief_content: generatedBrief,
+        brief_generated_at: new Date().toISOString()
+      })
+      .eq('id', client.id)
+
+    return {
+      success: true,
+      message: `**Client Brief — ${client.name}**\n\n${generatedBrief}`
+    }
+
+  } catch (error) {
+    console.error('Error generating client brief:', error)
+    return {
+      success: false,
+      message: "I encountered an error generating the brief. Please try again."
+    }
+  }
 }

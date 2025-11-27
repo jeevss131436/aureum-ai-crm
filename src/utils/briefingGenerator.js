@@ -1,4 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
+import OpenAI from 'openai'
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+})
 
 export async function generateDailyBriefing(userId) {
   const supabase = createClient(
@@ -6,7 +11,6 @@ export async function generateDailyBriefing(userId) {
     process.env.SUPABASE_SERVICE_ROLE_KEY
   )
   
-  // Get today's and tomorrow's deadlines
   const today = new Date()
   const tomorrow = new Date()
   tomorrow.setDate(tomorrow.getDate() + 1)
@@ -78,10 +82,7 @@ export async function generateDailyBriefing(userId) {
   }
 }
 
-
 export async function generateStrategicInsight(briefingData, userName) {
-  const geminiApiKey = process.env.GEMINI_API_KEY
-  
   const prompt = `You are Aureum AI, analyzing ${userName}'s real estate business.
 
 DATA:
@@ -95,46 +96,27 @@ Generate ONE actionable insight (40 words max) that:
 2. Suggests a specific action
 3. Is encouraging and strategic
 
-Examples:
-- "With 3 deals closing soon, consider preparing referral requests now while clients are excited."
-- "No urgent tasks today - perfect time to reach out to cold leads or update your marketing."
-- "Multiple inspections this week suggest strong market activity. Time to prospect for new listings?"
-
 Be specific, actionable, and professional. No generic advice.`
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.8,
-            maxOutputTokens: 100
-          }
-        })
-      }
-    )
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.8,
+      max_tokens: 100
+    })
 
-    const data = await response.json()
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || null
+    return completion.choices[0].message.content || null
   } catch (error) {
     console.error('Strategic insight error:', error)
     return null
   }
 }
 
-
 export async function generateAISummary(briefingData, userName) {
-  const geminiApiKey = process.env.GEMINI_API_KEY
-  
-  // Calculate priority
   const urgentCount = briefingData.overdue.length + briefingData.today.length
   const urgencyLevel = urgentCount === 0 ? 'light' : urgentCount <= 2 ? 'moderate' : 'high'
   
-  // Build deadline lists
   const todayList = briefingData.today.length > 0 
     ? briefingData.today.map(d => `• ${d.title} - ${d.transactions.property_address} (${d.transactions.clients.name})`).join('\n')
     : '• None - all caught up!'
@@ -173,32 +155,16 @@ Write a concise daily briefing (max 120 words):
 Tone: Confident, supportive, action-oriented. Use emojis (max 3). Be specific about properties/clients.`
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{ text: prompt }]
-          }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 200
-          }
-        })
-      }
-    )
-
-    const data = await response.json()
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.7,
+      max_tokens: 250
+    })
     
-    if (data.candidates && data.candidates[0]) {
-      return data.candidates[0].content.parts[0].text
-    } else {
-      throw new Error('No response from Gemini')
-    }
+    return completion.choices[0].message.content
   } catch (error) {
-    console.error('Gemini API error:', error)
+    console.error('OpenAI API error:', error)
     // Fallback if AI fails
     return `Good morning, ${userName}! 
 
