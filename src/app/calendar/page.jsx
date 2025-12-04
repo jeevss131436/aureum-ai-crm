@@ -1153,8 +1153,8 @@ function DayView({ currentDate, getEventsForDate, formatTime }) {
                   <button
                     onClick={async () => {
                       setSyncStatus('syncing')
-                      // Redirect to Google OAuth endpoint
-                      window.location.href = '/api/auth/google'
+                      // Redirect to Google OAuth endpoint with user ID
+                      window.location.href = `/api/auth/google?userId=${user.id}`
                     }}
                     disabled={syncStatus === 'syncing'}
                     className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold hover:shadow-xl transition-all hover:scale-105 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"

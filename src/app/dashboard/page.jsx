@@ -1,5 +1,5 @@
-"use client"
-import { useEffect, useState } from 'react'
+'use client'
+import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '@/utils/supabaseClient'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
@@ -8,6 +8,7 @@ import Image from 'next/image'
 function BriefingCarousel({ totalClients, hotLeads, activeDeals, clients, transactions, user, router }) {
   const [currentSlide, setCurrentSlide] = useState(0)
   const [isAutoPlaying, setIsAutoPlaying] = useState(true)
+  
   // Generate slides based on data
   const generateSlides = () => {
     const slides = []
@@ -150,6 +151,45 @@ function BriefingCarousel({ totalClients, hotLeads, activeDeals, clients, transa
     setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length)
     setIsAutoPlaying(false)
   }
+
+  
+
+  function getRankingExplanation(client, leadScore) {
+  const factors = []
+  
+  // Analyze what contributes to the ranking
+  if (leadScore >= 70) {
+    if (client.last_contact) {
+      const daysSinceContact = Math.floor((new Date() - new Date(client.last_contact)) / (1000 * 60 * 60 * 24))
+      if (daysSinceContact <= 3) {
+        factors.push("Recent engagement (contacted within 3 days)")
+      }
+    }
+    if (client.status === 'hot') {
+      factors.push("Hot lead status indicates high intent")
+    }
+    if (client.property_preferences?.budget_max) {
+      factors.push("Clear budget defined")
+    }
+  } else if (leadScore >= 40) {
+    if (client.status === 'warm') {
+      factors.push("Warm lead - needs nurturing")
+    }
+    const daysSinceContact = client.last_contact 
+      ? Math.floor((new Date() - new Date(client.last_contact)) / (1000 * 60 * 60 * 24))
+      : 999
+    if (daysSinceContact > 7) {
+      factors.push("No contact in over a week")
+    }
+  } else {
+    factors.push("Cold lead - low recent activity")
+    if (!client.last_contact) {
+      factors.push("Never contacted")
+    }
+  }
+  
+  return factors.length > 0 ? factors : ["Score based on engagement patterns"]
+}
 
   return (
     <div className="bg-white rounded-3xl shadow-2xl border border-gray-200 overflow-hidden">
@@ -297,6 +337,8 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedClient, setSelectedClient] = useState(null)
   const [showClientModal, setShowClientModal] = useState(false)
+  const [leadTypeFilter, setLeadTypeFilter] = useState('all') // 'all', 'buyer', 'seller', 'past_client'
+  const [showRankingTooltip, setShowRankingTooltip] = useState(null) // Track which client's tooltip is showing
   const router = useRouter()
 
   // Add animation styles
@@ -342,58 +384,56 @@ export default function DashboardPage() {
   }
 
   async function fetchDashboardData(userId) {
-    try {
-      // Fetch transactions with their linked clients
-      const { data: transactionsData, error: transError } = await supabase
-        .from('transactions')
-        .select(`
-          *,
-          clients (
-            id,
-            name,
-            email,
-            phone,
-            status,
-            created_at
-          )
-        `)
-        .eq('user_id', userId)
+  try {
+    // Fetch transactions with their linked clients
+    const { data: transactionsData, error: transError } = await supabase
+      .from('transactions')
+      .select(`
+        *,
+        clients (
+          id,
+          name,
+          email,
+          phone,
+          status,
+          last_contact,
+          created_at,
+          property_preferences
+        )
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
 
-      if (transError) {
-        console.error('Error fetching transactions:', transError)
-        return
-      }
+    if (transError) {
+      console.error('Error fetching transactions:', transError)
+    }
 
-      console.log('Fetched transactions:', transactionsData)
-      setTransactions(transactionsData || [])
-      
-      // Extract unique clients from transactions (only clients with transactions)
-      const clientsFromTransactions = []
-      const seenClientIds = new Set()
-      
-      transactionsData?.forEach(transaction => {
-        if (transaction.clients && !seenClientIds.has(transaction.clients.id)) {
-          seenClientIds.add(transaction.clients.id)
-          clientsFromTransactions.push({
+    console.log('Fetched transactions:', transactionsData)
+    setTransactions(transactionsData || [])
+    
+    // Extract unique clients from transactions
+    const clientsMap = new Map()
+    
+    transactionsData?.forEach(transaction => {
+      if (transaction.clients) {
+        const clientId = transaction.clients.id
+        if (!clientsMap.has(clientId)) {
+          clientsMap.set(clientId, {
             ...transaction.clients,
-            // Add transaction reference for quick access
+            lead_type: transaction.transaction_type, // buyer or seller
             transaction_id: transaction.id
           })
         }
-      })
-      
-      console.log('Extracted clients:', clientsFromTransactions)
-      
-      // Sort by most recently created
-      clientsFromTransactions.sort((a, b) => 
-        new Date(b.created_at) - new Date(a.created_at)
-      )
-      
-      setClients(clientsFromTransactions)
-    } catch (error) {
-      console.error('Error in fetchDashboardData:', error)
-    }
+      }
+    })
+
+    const clientsArray = Array.from(clientsMap.values())
+    setClients(clientsArray)
+
+  } catch (error) {
+    console.error('Error in fetchDashboardData:', error)
   }
+}
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -438,11 +478,55 @@ export default function DashboardPage() {
     return { label: 'Cold Lead', color: 'from-blue-500 to-cyan-500', textColor: 'text-blue-600', bgColor: 'bg-blue-50' }
   }
 
-  const filteredClients = clients.filter(client =>
-    client.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    client.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    client.phone?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  function getRankingExplanation(client, leadScore) {
+  const factors = []
+  
+  if (leadScore >= 70) {
+    if (client.last_contact) {
+      const daysSinceContact = Math.floor((new Date() - new Date(client.last_contact)) / (1000 * 60 * 60 * 24))
+      if (daysSinceContact <= 3) {
+        factors.push("Recent engagement (contacted within 3 days)")
+      }
+    }
+    if (client.status === 'hot') {
+      factors.push("Hot lead status indicates high intent")
+    }
+    if (client.property_preferences?.budget_max) {
+      factors.push("Clear budget defined")
+    }
+  } else if (leadScore >= 40) {
+    if (client.status === 'warm') {
+      factors.push("Warm lead - needs nurturing")
+    }
+    const daysSinceContact = client.last_contact 
+      ? Math.floor((new Date() - new Date(client.last_contact)) / (1000 * 60 * 60 * 24))
+      : 999
+    if (daysSinceContact > 7) {
+      factors.push("No contact in over a week")
+    }
+  } else {
+    factors.push("Cold lead - low recent activity")
+    if (!client.last_contact) {
+      factors.push("Never contacted")
+    }
+  }
+  
+  return factors.length > 0 ? factors : ["Score based on engagement patterns"]
+}
+
+  const filteredClients = useMemo(() => {
+  return clients.filter(client => {
+    const matchesSearch = !searchQuery || 
+      client.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      client.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      client.phone?.includes(searchQuery)
+    
+    const matchesLeadType = leadTypeFilter === 'all' || 
+      client.lead_type === leadTypeFilter
+    
+    return matchesSearch && matchesLeadType
+  })
+}, [clients, searchQuery, leadTypeFilter])
 
   // Calculate stats
   const activeDeals = transactions.filter(t => t.status === 'active').length
@@ -664,9 +748,8 @@ export default function DashboardPage() {
           <section className="min-h-[calc(100vh-4rem)] p-6 lg:p-8 py-12">
             <div className="max-w-7xl mx-auto h-full flex flex-col">
               
-            {/* CRM Section */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex-1 flex flex-col">
-              {/* CRM Header */}
+            {/* Client Management Section */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col h-[600px]">
               <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
                 <div className="flex items-center justify-between mb-4">
                   <div>
@@ -681,13 +764,13 @@ export default function DashboardPage() {
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                       </svg>
-                      New Transaction
+                      New Client
                     </div>
                   </button>
                 </div>
 
                 {/* Search Bar */}
-                <div className="relative">
+                <div className="relative mb-4">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -700,6 +783,32 @@ export default function DashboardPage() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#B89A5A]/30 focus:border-[#B89A5A] outline-none transition-all"
                   />
+                </div>
+
+                {/* Smart Filtering Dropdown */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-700">Filter by:</span>
+                  <div className="relative">
+                    <select
+                      value={leadTypeFilter}
+                      onChange={(e) => setLeadTypeFilter(e.target.value)}
+                      className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white hover:bg-gray-50 focus:ring-2 focus:ring-[#B89A5A]/30 focus:border-[#B89A5A] outline-none transition-all cursor-pointer"
+                    >
+                      <option value="all">All Clients</option>
+                      <option value="buyer">Buyers</option>
+                      <option value="seller">Sellers</option>
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+                  {leadTypeFilter !== 'all' && (
+                    <span className="text-xs text-gray-500">
+                      {filteredClients.length} result{filteredClients.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -715,7 +824,7 @@ export default function DashboardPage() {
                         Contact
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                        Status
+                        Lead Type
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                         Last Contact
@@ -730,6 +839,7 @@ export default function DashboardPage() {
                       filteredClients.map((client) => {
                         const leadScore = calculateLeadScore(client)
                         const ranking = getLeadRanking(leadScore)
+                        const explanationFactors = getRankingExplanation(client, leadScore)
                         
                         return (
                           <tr 
@@ -775,14 +885,24 @@ export default function DashboardPage() {
                               </div>
                             </td>
 
-                            {/* Status */}
+                            {/* Lead Type (CHANGED FROM STATUS) */}
                             <td className="px-6 py-4">
-                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                                client.status === 'active' ? 'bg-green-100 text-green-700' :
-                                client.status === 'lead' ? 'bg-blue-100 text-blue-700' :
+                              <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${
+                                client.lead_type === 'buyer' ? 'bg-blue-100 text-blue-700' :
+                                client.lead_type === 'seller' ? 'bg-purple-100 text-purple-700' :
                                 'bg-gray-100 text-gray-700'
                               }`}>
-                                {client.status || 'Unknown'}
+                                {client.lead_type === 'buyer' && (
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                                  </svg>
+                                )}
+                                {client.lead_type === 'seller' && (
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                  </svg>
+                                )}
+                                {client.lead_type ? client.lead_type.replace('_', ' ') : 'etc.'}
                               </span>
                             </td>
 
@@ -794,7 +914,7 @@ export default function DashboardPage() {
                               }
                             </td>
 
-                            {/* AI Lead Ranking */}
+                            {/* AI Lead Ranking with Tooltip */}
                             <td className="px-6 py-4">
                               <div className="space-y-2">
                                 <div className="flex items-center justify-between gap-3">
@@ -814,14 +934,55 @@ export default function DashboardPage() {
                                   />
                                 </div>
 
-                                {/* AI Badge */}
-                                <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full ${ranking.bgColor}`}>
-                                  <svg className={`w-3 h-3 ${ranking.textColor}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                  </svg>
-                                  <span className={`text-xs font-medium ${ranking.textColor}`}>
-                                    AI Ranked
-                                  </span>
+                                {/* AI Badge with Question Mark */}
+                                <div className="flex items-center justify-between">
+                                  <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full ${ranking.bgColor}`}>
+                                    <svg className={`w-3 h-3 ${ranking.textColor}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                    <span className={`text-xs font-medium ${ranking.textColor}`}>
+                                      AI Ranked
+                                    </span>
+                                  </div>
+                                  
+                                  {/* Question Mark with Tooltip */}
+                                  <div className="relative">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setShowRankingTooltip(showRankingTooltip === client.id ? null : client.id)
+                                      }}
+                                      className="w-5 h-5 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-gray-600 hover:text-gray-800 transition-all"
+                                    >
+                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                      </svg>
+                                    </button>
+                                    
+                                    {/* Tooltip */}
+                                    {showRankingTooltip === client.id && (
+                                      <div className="absolute right-0 bottom-full mb-2 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-xl z-50">
+                                        <div className="flex items-start gap-2 mb-2">
+                                          <svg className="w-4 h-4 text-[#B89A5A] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                          </svg>
+                                          <div>
+                                            <p className="font-semibold mb-1">Why this ranking?</p>
+                                            <ul className="space-y-1 text-gray-300">
+                                              {explanationFactors.map((factor, idx) => (
+                                                <li key={idx} className="flex items-start gap-1">
+                                                  <span className="text-[#B89A5A] mt-0.5">•</span>
+                                                  <span>{factor}</span>
+                                                </li>
+                                              ))}
+                                            </ul>
+                                          </div>
+                                        </div>
+                                        {/* Arrow */}
+                                        <div className="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             </td>
@@ -835,14 +996,34 @@ export default function DashboardPage() {
                             <svg className="w-16 h-16 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                             </svg>
-                            <p className="text-gray-500 font-medium">No clients found</p>
-                            <p className="text-sm text-gray-400">Create your first transaction to add a client</p>
-                            <button
-                              onClick={() => router.push('/transactions')}
-                              className="mt-2 px-4 py-2 bg-[#B89A5A] text-white rounded-lg hover:bg-[#A68949] transition-colors"
-                            >
-                              New Transaction
-                            </button>
+                            <p className="text-gray-500 font-medium">
+                              {searchQuery || leadTypeFilter !== 'all' 
+                                ? 'No clients match your filters'
+                                : 'No clients found'
+                              }
+                            </p>
+                            {(searchQuery || leadTypeFilter !== 'all') && (
+                              <button
+                                onClick={() => {
+                                  setSearchQuery('')
+                                  setLeadTypeFilter('all')
+                                }}
+                                className="text-sm text-[#B89A5A] hover:text-[#A68949] font-medium"
+                              >
+                                Clear filters
+                              </button>
+                            )}
+                            {!searchQuery && leadTypeFilter === 'all' && (
+                              <>
+                                <p className="text-sm text-gray-400">Create your first transaction to add a client</p>
+                                <button
+                                  onClick={() => router.push('/transactions')}
+                                  className="mt-2 px-4 py-2 bg-[#B89A5A] text-white rounded-lg hover:bg-[#A68949] transition-colors"
+                                >
+                                  New Transaction
+                                </button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1025,20 +1206,28 @@ export default function DashboardPage() {
                 Close
               </button>
               
-              {selectedClient.transaction_id && (
-                <button
-                  onClick={() => {
-                    setShowClientModal(false)
+              {/* View Full Transaction Button - ALWAYS SHOW */}
+              <button
+                onClick={() => {
+                  setShowClientModal(false)
+                  // Find the transaction for this client
+                  const clientTransaction = transactions.find(t => t.client_id === selectedClient.id)
+                  if (clientTransaction) {
+                    router.push(`/transactions/${clientTransaction.id}`)
+                  } else if (selectedClient.transaction_id) {
                     router.push(`/transactions/${selectedClient.transaction_id}`)
-                  }}
-                  className="px-6 py-3 bg-gradient-to-r from-[#B89A5A] to-[#9B8049] text-white rounded-xl font-semibold hover:shadow-xl transition-all hover:scale-105 flex items-center gap-2"
-                >
-                  <span>View Full Transaction</span>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                  </svg>
-                </button>
-              )}
+                  } else {
+                    // Fallback to transactions page
+                    router.push('/transactions')
+                  }
+                }}
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-[#B89A5A] to-[#9B8049] text-white rounded-xl font-semibold hover:shadow-xl transition-all hover:scale-105 flex items-center justify-center gap-2"
+              >
+                <span>View Full Transaction</span>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </button>
             </div>
           </div>
         </div>
