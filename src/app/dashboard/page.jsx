@@ -815,7 +815,23 @@ export default function DashboardPage() {
           <div className="px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <h1 style={{ fontFamily: 'Trajan Pro, serif' }} className="text-2xl font-bold text-gray-900">Dashboard</h1>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4">
+                {/* Subscription Badge */}
+                <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#B89A5A]/10 to-[#9B8049]/10 rounded-xl border border-[#B89A5A]/20">
+                  <div className={`w-2 h-2 rounded-full ${
+                    user?.user_metadata?.subscription_status === 'active' ? 'bg-green-500' :
+                    user?.user_metadata?.subscription_status === 'cancelled' ? 'bg-yellow-500' :
+                    'bg-gray-400'
+                  }`}></div>
+                  <span className="text-sm font-semibold text-gray-700">
+                    {user?.user_metadata?.subscription_plan?.toUpperCase() || 'FREE'} Plan
+                  </span>
+                  {user?.user_metadata?.subscription_status === 'cancelled' && (
+                    <span className="text-xs text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full">
+                      Cancelled
+                    </span>
+                  )}
+                </div>
                 <div className="text-sm text-gray-600">
                   Welcome, <span className="font-semibold text-gray-900">{user?.user_metadata?.full_name || user?.email}</span>
                 </div>

@@ -9,6 +9,12 @@ export default function ProfilePage() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showCancelModal, setShowCancelModal] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+
+  const [formData, setFormData] = useState({
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [message, setMessage] = useState('')
   
@@ -27,6 +33,8 @@ export default function ProfilePage() {
     company: '',
     license_number: ''
   })
+
+  const [message, setMessage] = useState({ type: '', text: '' })
 
   useEffect(() => {
     checkUser()
@@ -66,6 +74,53 @@ export default function ProfilePage() {
           license_number: profileForm.license_number
         }
       })
+
+  const handleCancelSubscription = async () => {
+    try {
+      setSaving(true)
+      setMessage({ type: '', text: '' })
+
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          subscription_status: 'cancelled',
+          subscription_end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+        }
+      })
+
+      if (error) throw error
+
+      setMessage({ type: 'success', text: 'Subscription cancelled. Access continues until end date.' })
+      setShowCancelModal(false)
+      await fetchUserProfile()
+
+    } catch (error) {
+      console.error('Error cancelling subscription:', error)
+      setMessage({ type: 'error', text: 'Failed to cancel subscription' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    try {
+      setSaving(true)
+
+      await supabase
+        .from('transactions')
+        .delete()
+        .eq('user_id', user.id)
+
+      await supabase
+        .from('clients')
+        .delete()
+        .eq('user_id', user.id)
+
+      const { error } = await supabase.rpc('delete_user')
+
+      if (error) throw error
+
+      await supabase.auth.signOut()
+      router.push('/')
 
       if (error) throw error
       setMessage('Profile updated successfully!')
@@ -388,6 +443,137 @@ export default function ProfilePage() {
                 </div>
               </div>
 
+          {/* Subscription Management */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+            <div className="p-8">
+              <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <div className="w-8 h-8 bg-[#B89A5A]/10 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-[#B89A5A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                  </svg>
+                </div>
+                Subscription & Billing
+              </h3>
+
+              {/* Current Plan Display */}
+              <div className="p-6 bg-gradient-to-br from-[#B89A5A]/5 to-[#9B8049]/5 rounded-xl border-2 border-[#B89A5A]/20 mb-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-3">
+                      <h4 className="text-2xl font-bold text-gray-900" style={{ fontFamily: 'Trajan Pro, serif' }}>
+                        {user?.user_metadata?.subscription_plan?.toUpperCase() || 'FREE'} Plan
+                      </h4>
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        user?.user_metadata?.subscription_status === 'active' ? 'bg-green-100 text-green-700' :
+                        user?.user_metadata?.subscription_status === 'cancelled' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {user?.user_metadata?.subscription_status === 'active' ? '● Active' :
+                         user?.user_metadata?.subscription_status === 'cancelled' ? '● Cancelled' :
+                         '● Free'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2 text-sm text-gray-600">
+                      {user?.user_metadata?.subscription_plan === 'pro' && (
+                        <>
+                          <p className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                            Unlimited clients & transactions
+                          </p>
+                          <p className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                            AI-powered insights & briefings
+                          </p>
+                          <p className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                            Priority support
+                          </p>
+                        </>
+                      )}
+                      {!user?.user_metadata?.subscription_plan || user?.user_metadata?.subscription_plan === 'free' && (
+                        <p className="text-gray-500">Upgrade to Pro for unlimited access and AI features</p>
+                      )}
+                    </div>
+
+                    {user?.user_metadata?.subscription_status === 'cancelled' && user?.user_metadata?.subscription_end_date && (
+                      <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="text-sm text-yellow-800 flex items-center gap-2">
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                          Your subscription ends on {new Date(user.user_metadata.subscription_end_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    {(!user?.user_metadata?.subscription_plan || user?.user_metadata?.subscription_plan === 'free') && (
+                      <button
+                        onClick={() => setMessage({ type: 'success', text: 'Upgrade feature coming soon!' })}
+                        className="px-6 py-2.5 bg-gradient-to-r from-[#B89A5A] to-[#9B8049] text-white rounded-xl font-medium hover:shadow-lg transition-all hover:scale-105"
+                      >
+                        Upgrade to Pro
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Cancel Subscription */}
+              {user?.user_metadata?.subscription_plan && user?.user_metadata?.subscription_plan !== 'free' && user?.user_metadata?.subscription_status === 'active' && (
+                <div className="p-5 bg-orange-50 rounded-xl border-2 border-orange-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-orange-900">Cancel Subscription</h4>
+                        <p className="text-sm text-orange-700 mt-1">You'll retain access until the end of your billing period</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShowCancelModal(true)}
+                      className="px-5 py-2.5 bg-orange-600 text-white rounded-xl font-medium hover:bg-orange-700 transition-all hover:shadow-lg"
+                    >
+                      Cancel Plan
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Account Management */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+            <div className="p-8">
+              <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
+                Account Security
+              </h3>
+              
+              {/* Change Password */}
+              <div className="p-5 bg-blue-50 rounded-xl border-2 border-blue-100 mb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                      </svg>
               {/* Sidebar Cards */}
               <div className="space-y-6">
                 {/* Subscription Card */}
@@ -478,6 +664,144 @@ export default function ProfilePage() {
           </div>
         </div>
       </main>
+
+      {/* Cancel Subscription Confirmation Modal */}
+      {showCancelModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 scale-100 animate-[scale-in_0.2s_ease-out]">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-14 h-14 bg-orange-100 rounded-2xl flex items-center justify-center">
+                <svg className="w-7 h-7 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Cancel Subscription?</h3>
+                <p className="text-sm text-gray-500">You can reactivate anytime</p>
+              </div>
+            </div>
+
+            <p className="text-gray-700 mb-4">
+              Your subscription will be cancelled, but you'll retain access to all Pro features until the end of your current billing period (30 days from now).
+            </p>
+
+            <ul className="text-sm text-gray-600 space-y-2 mb-6 bg-gray-50 rounded-xl p-4 border border-gray-200">
+              <li className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Keep access for the next 30 days
+              </li>
+              <li className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                No further charges after period ends
+              </li>
+              <li className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Reactivate anytime you want
+              </li>
+            </ul>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowCancelModal(false)}
+                disabled={saving}
+                className="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-all"
+              >
+                Keep Subscription
+              </button>
+              <button
+                onClick={handleCancelSubscription}
+                disabled={saving}
+                className="flex-1 px-6 py-3 bg-orange-600 text-white rounded-xl font-semibold hover:bg-orange-700 transition-all hover:shadow-xl disabled:opacity-50"
+              >
+                {saving ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Cancelling...
+                  </span>
+                ) : 'Cancel Subscription'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 scale-100 animate-[scale-in_0.2s_ease-out]">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-14 h-14 bg-red-100 rounded-2xl flex items-center justify-center">
+                <svg className="w-7 h-7 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Delete Account?</h3>
+                <p className="text-sm text-gray-500">This action cannot be undone</p>
+              </div>
+            </div>
+            
+            <p className="text-gray-700 mb-4 font-medium">
+              This will permanently delete:
+            </p>
+            
+            <ul className="text-sm text-gray-600 space-y-2 mb-6 bg-gray-50 rounded-xl p-4 border border-gray-200">
+              <li className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                Your profile information
+              </li>
+              <li className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                All transactions and timelines
+              </li>
+              <li className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                All clients and leads
+              </li>
+              <li className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                All chat history and briefings
+              </li>
+            </ul>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                disabled={saving}
+                className="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={saving}
+                className="flex-1 px-6 py-3 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-all hover:shadow-xl disabled:opacity-50"
+              >
+                {saving ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Deleting...
+                  </span>
+                ) : 'Delete Forever'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

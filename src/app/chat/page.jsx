@@ -451,7 +451,18 @@ export default function ChatPage() {
           </div>
           
           <div className="flex items-center gap-3">
-            
+            {/* Subscription Badge */}
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-[#B89A5A]/10 to-[#9B8049]/10 rounded-lg border border-[#B89A5A]/20">
+              <div className={`w-2 h-2 rounded-full ${
+                user?.user_metadata?.subscription_status === 'active' ? 'bg-green-500' :
+                user?.user_metadata?.subscription_status === 'cancelled' ? 'bg-yellow-500' :
+                'bg-gray-400'
+              }`}></div>
+              <span className="text-xs font-semibold text-gray-700">
+                {user?.user_metadata?.subscription_plan?.toUpperCase() || 'FREE'}
+              </span>
+            </div>
+
             <button
               onClick={() => router.push('/profile')}
               className="flex items-center gap-2 px-4 py-2 bg-[#F7F5EF] rounded-lg border border-[#B89A5A]/30 hover:border-[#B89A5A] transition-all"
