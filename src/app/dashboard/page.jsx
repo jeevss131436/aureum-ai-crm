@@ -327,7 +327,96 @@ function BriefingCarousel({ totalClients, hotLeads, activeDeals, clients, transa
     </div>
   )
 }
-
+// Upgrade Promotion Banner Component
+function UpgradeBanner({ subscription, router }) {
+  const [dismissed, setDismissed] = useState(false)
+  
+  // Don't show if lifetime user or dismissed
+  if (subscription?.plan?.type === 'lifetime' || dismissed) return null
+  
+  const isTeam = subscription?.plan?.name === 'Team Plan'
+  
+  return (
+    <div className="relative overflow-hidden bg-gradient-to-r from-[#1a1a2e] via-[#16213e] to-[#0f3460] rounded-2xl p-6 mb-8 shadow-xl">
+      {/* Animated background elements */}
+      <div className="absolute top-0 right-0 w-64 h-64 bg-[#B89A5A]/20 rounded-full blur-3xl -mr-32 -mt-32"></div>
+      <div className="absolute bottom-0 left-0 w-48 h-48 bg-[#B89A5A]/10 rounded-full blur-2xl -ml-24 -mb-24"></div>
+      
+      {/* Dismiss button */}
+      <button 
+        onClick={() => setDismissed(true)}
+        className="absolute top-4 right-4 text-white/40 hover:text-white/80 transition-colors"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+      
+      <div className="relative z-10 flex items-center justify-between gap-6">
+        <div className="flex items-center gap-5">
+          {/* Star icon */}
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#B89A5A] to-[#D4B96A] flex items-center justify-center shadow-lg">
+            <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+            </svg>
+          </div>
+          
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <h3 className="text-lg font-bold text-white">
+                {isTeam ? 'Lock In Lifetime Access' : 'Upgrade to Lifetime'}
+              </h3>
+              <span className="px-2 py-0.5 bg-[#B89A5A]/20 text-[#D4B96A] text-xs font-semibold rounded-full border border-[#B89A5A]/30">
+                Limited Spots
+              </span>
+            </div>
+            <p className="text-white/70 text-sm max-w-md">
+              Pay once, own forever. No more monthly payments. Only <span className="text-[#D4B96A] font-semibold">8 spots left</span> at the early bird price of $3,500.
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <div className="text-right hidden lg:block">
+            <p className="text-white/50 text-xs line-through">$5,000</p>
+            <p className="text-2xl font-bold text-white">$3,500</p>
+          </div>
+          <button
+            onClick={() => router.push('/profile')}
+            className="px-6 py-3 bg-gradient-to-r from-[#B89A5A] to-[#D4B96A] text-white rounded-xl font-semibold hover:shadow-xl hover:scale-105 transition-all flex items-center gap-2 whitespace-nowrap"
+          >
+            <span>View Plans</span>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </button>
+        </div>
+      </div>
+      
+      {/* Savings callout */}
+      <div className="relative z-10 mt-4 flex items-center gap-4">
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-white/10 rounded-lg">
+          <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          <span className="text-white/80 text-xs">All future features included</span>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-white/10 rounded-lg">
+          <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          <span className="text-white/80 text-xs">Priority support for life</span>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-white/10 rounded-lg">
+          <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          <span className="text-white/80 text-xs">Save $2,324+ over 3 years</span>
+        </div>
+      </div>
+    </div>
+  )
+}
 export default function DashboardPage() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -340,6 +429,11 @@ export default function DashboardPage() {
   const [leadTypeFilter, setLeadTypeFilter] = useState('all') // 'all', 'buyer', 'seller', 'past_client'
   const [showRankingTooltip, setShowRankingTooltip] = useState(null) // Track which client's tooltip is showing
   const router = useRouter()
+  const [subscription, setSubscription] = useState({
+  plan: { name: 'Solo Plan', type: 'monthly', price: 98 },
+  status: 'active',
+  nextBilling: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
+})
 
   // Add animation styles
   useEffect(() => {
@@ -478,6 +572,39 @@ export default function DashboardPage() {
     return { label: 'Cold Lead', color: 'from-blue-500 to-cyan-500', textColor: 'text-blue-600', bgColor: 'bg-blue-50' }
   }
 
+  function getTierBadge(subscription) {
+  if (!subscription) return null;
+  
+  if (subscription.plan?.type === 'lifetime') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-[#B89A5A] to-[#D4B96A] text-white text-xs font-semibold rounded-full shadow-sm">
+        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+        </svg>
+        Lifetime
+      </span>
+    )
+  }
+  if (subscription.plan?.name === 'Team Plan') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+        Team
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+      </svg>
+      Solo
+    </span>
+  )
+}
+
   function getRankingExplanation(client, leadScore) {
   const factors = []
   
@@ -573,7 +700,46 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {/* Navigation Links */}
+        {/* Account Tier Badge */}
+        {sidebarOpen && (
+          <div className="px-4 py-3 border-b border-gray-200">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-gray-500">Account</span>
+              {getTierBadge()}
+            </div>
+            {/* Small Upgrade Button - Only for non-lifetime users */}
+            {subscription.plan.type !== 'lifetime' && (
+              <button
+                onClick={() => router.push('/billing')}
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-[#B89A5A]/10 to-[#D4B96A]/10 hover:from-[#B89A5A]/20 hover:to-[#D4B96A]/20 border border-[#B89A5A]/30 text-[#B89A5A] text-xs font-medium rounded-lg transition-all group"
+              >
+                <svg className="w-3 h-3 group-hover:scale-110 transition-transform" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                </svg>
+                <span>Upgrade to Lifetime</span>
+              </button>
+            )}
+          </div>
+        )}
+        {!sidebarOpen && subscription && (
+          <div className="py-3 border-b border-gray-200 flex flex-col items-center gap-2">
+            {getTierBadge()}
+            {/* Small star icon upgrade hint when collapsed */}
+            {subscription.plan.type !== 'lifetime' && (
+              <button
+                onClick={() => router.push('/billing')}
+                className="w-8 h-8 flex items-center justify-center bg-gradient-to-r from-[#B89A5A]/10 to-[#D4B96A]/10 hover:from-[#B89A5A]/20 hover:to-[#D4B96A]/20 border border-[#B89A5A]/30 text-[#B89A5A] rounded-lg transition-all"
+                title="Upgrade to Lifetime"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Navigation Links - No Billing link */}
         <nav className="p-4 space-y-2">
           <button
             onClick={() => router.push('/dashboard')}
@@ -581,7 +747,7 @@ export default function DashboardPage() {
               sidebarOpen ? 'justify-start' : 'justify-center'
             } bg-[#B89A5A]/10 text-[#B89A5A] font-medium`}
           >
-            <Image src="/house-line.svg" alt="Aureum" width={28} height={28} className="object-contain" />
+            <Image src="/house-line.svg" alt="Dashboard" width={28} height={28} className="object-contain" />
             {sidebarOpen && <span>Dashboard</span>}
           </button>
 
@@ -591,10 +757,9 @@ export default function DashboardPage() {
               sidebarOpen ? 'justify-start' : 'justify-center'
             } text-gray-600 hover:bg-gray-100 hover:text-gray-900`}
           >
-            <Image src="/clipboard-text.svg" alt="Navius" width={28} height={28} className="object-contain" />
+            <Image src="/clipboard-text.svg" alt="Transactions" width={28} height={28} className="object-contain" />
             {sidebarOpen && <span>Transactions</span>}
           </button>
-
 
           <button
             onClick={() => router.push('/calendar')}
@@ -602,7 +767,7 @@ export default function DashboardPage() {
               sidebarOpen ? 'justify-start' : 'justify-center'
             } text-gray-600 hover:bg-gray-100 hover:text-gray-900`}
           >
-            <Image src="/calendar-dots.svg" alt="Aureum" width={28} height={28} className="object-contain" />
+            <Image src="/calendar-dots.svg" alt="Calendar" width={28} height={28} className="object-contain" />
             {sidebarOpen && <span>Calendar</span>}
           </button>
 
@@ -622,7 +787,7 @@ export default function DashboardPage() {
               sidebarOpen ? 'justify-start' : 'justify-center'
             } text-gray-600 hover:bg-gray-100 hover:text-gray-900`}
           >
-            <Image src="/user-circle.svg" alt="Navius" width={28} height={28} className="object-contain" />
+            <Image src="/user-circle.svg" alt="Profile" width={28} height={28} className="object-contain" />
             {sidebarOpen && <span>Profile</span>}
           </button>
         </nav>
@@ -703,29 +868,28 @@ export default function DashboardPage() {
                 </p>
 
                 {/* Quick Actions */}
-                <div className="flex flex-wrap items-center justify-center gap-4 mb-32">
-                  <button
-                    onClick={() => router.push('/transactions')}
-                    className="px-6 py-3 bg-gradient-to-r from-[#B89A5A] to-[#9B8049] text-white rounded-xl font-semibold hover:shadow-xl transition-all hover:scale-105"
-                  >
-                    View Transactions
-                  </button>
-
+                <div className="flex flex-wrap items-center justify-center gap-4 mb-16">
                   <button
                     onClick={() => router.push('/chat')}
-                    className="px-6 py-3 bg-white text-gray-900 rounded-xl font-semibold border-2 border-gray-200 hover:shadow-xl transition-all hover:scale-105 flex items-center gap-2"
+                    className="px-8 py-4 bg-gradient-to-r from-[#B89A5A] to-[#9B8049] text-white rounded-2xl font-semibold hover:shadow-2xl transition-all hover:scale-105 flex items-center gap-3"
                   >
-                    <Image src="/aureum-logo.png" alt="Navius" width={20} height={20} className="object-contain" />
+                    <Image src="/aureum-logo.png" alt="Navius" width={24} height={24} className="object-contain" />
                     Chat with Navius
                   </button>
+                  <button
+                    onClick={() => router.push('/transactions')}
+                    className="px-8 py-4 bg-white text-gray-900 rounded-2xl font-semibold border-2 border-gray-200 hover:shadow-2xl transition-all hover:scale-105 flex items-center gap-3"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    New Transaction
+                  </button>
                 </div>
-              </div>
 
-              {/* Scroll Indicator */}
-              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 animate-bounce">
-                <div className="flex flex-col items-center gap-2 text-gray-400">
-                  <span className="text-sm font-medium" style={{color: '#00bbffff'}}>Scroll to view briefing</span>
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{color: '#00bbffff'}}>
+                {/* Scroll indicator */}
+                <div className="animate-bounce">
+                  <svg className="w-6 h-6 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                   </svg>
                 </div>
@@ -733,14 +897,14 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          {/* Daily Briefing Section - Full Screen */}
-          <section className="min-h-[calc(100vh-4rem)] flex items-center justify-center relative overflow-hidden py-12">
-            {/* Subtle Background */}
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-purple-50"></div>
-            
-            {/* Briefing Card */}
-            <div className="relative z-10 max-w-3xl mx-auto px-6">
-              <BriefingCarousel 
+          {/* Briefing Section */}
+          <section className="py-16 px-6 lg:px-8">
+            <div className="max-w-5xl mx-auto">
+              {/* Upgrade Banner - Only shows for non-lifetime users */}
+              <UpgradeBanner subscription={subscription} router={router} />
+              
+              {/* Daily Briefing */}
+              <BriefingCarousel
                 totalClients={totalClients}
                 hotLeads={hotLeads}
                 activeDeals={activeDeals}
@@ -749,17 +913,8 @@ export default function DashboardPage() {
                 user={user}
                 router={router}
               />
-
-              {/* Scroll Indicator */}
-              <div className="mt-8 text-center animate-bounce">
-                <p className="text-sm text-gray-500 mb-2" style={{color: '#00bbffff'}}>Scroll to view clients</p>
-                <svg className="w-6 h-6 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{color: '#00bbffff'}}>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                </svg>
-              </div>
             </div>
           </section>
-
           {/* CRM Section - Full Screen */}
           <section className="min-h-[calc(100vh-4rem)] p-6 lg:p-8 py-12">
             <div className="max-w-7xl mx-auto h-full flex flex-col">
