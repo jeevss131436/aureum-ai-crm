@@ -354,7 +354,6 @@ export default function ChatPage() {
               </svg>
                 Calendar
               </button>
-              
             </div>
           </div>
 

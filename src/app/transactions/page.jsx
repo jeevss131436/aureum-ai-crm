@@ -280,6 +280,7 @@ export default function TransactionsPage() {
                       <Image src="/user-circle.svg" alt="Navius" width={28} height={28} className="object-contain" />
                       {sidebarOpen && <span>Profile</span>}
                     </button>
+                    
         </nav>
 
         {/* Logout Button */}

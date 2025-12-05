@@ -312,6 +312,39 @@ export default function CalendarPage() {
     })
   }
 
+  function getTierBadge(subscription) {
+  if (!subscription) return null;
+  
+  if (subscription.plan?.type === 'lifetime') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-[#B89A5A] to-[#D4B96A] text-white text-xs font-semibold rounded-full shadow-sm">
+        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+        </svg>
+        Lifetime
+      </span>
+    )
+  }
+  if (subscription.plan?.name === 'Team Plan') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+        Team
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+      </svg>
+      Solo
+    </span>
+  )
+}
+
   function getWeekDays(date) {
     const currentDate = new Date(date)
     const day = currentDate.getDay() // 0 (Sunday) to 6 (Saturday)

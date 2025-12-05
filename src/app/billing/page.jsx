@@ -30,6 +30,49 @@ export default function BillingPage() {
     zip: ''
   })
 
+  function getTierBadge() {
+    if (subscription?.plan?.type === 'lifetime') {
+      return (
+        <button
+          onClick={() => router.push('/profile')}
+          className="inline-flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-[#B89A5A] to-[#D4B96A] text-white text-xs font-semibold rounded-full shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer"
+        >
+          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+          </svg>
+          Lifetime
+        </button>
+      )
+    }
+    if (subscription?.plan?.name === 'Team Plan') {
+      return (
+        <button
+          onClick={() => router.push('/profile')}
+          className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full hover:bg-blue-200 hover:scale-105 transition-all cursor-pointer"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+          Team
+        </button>
+      )
+    }
+    if (subscription?.plan?.name === 'Solo Plan') {
+      return (
+        <button
+          onClick={() => router.push('/profile')}
+          className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full hover:bg-gray-200 hover:scale-105 transition-all cursor-pointer"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+          Solo
+        </button>
+      )
+    }
+    return null
+  }
+
   // Mock billing history
   const [billingHistory] = useState([
     { id: '1', date: 'December 2, 2025', amount: 98.00, status: 'Paid', invoiceId: 'INV-2025-001' },
@@ -192,6 +235,21 @@ export default function BillingPage() {
           </button>
         </div>
 
+        {/* Account Tier Badge */}
+        {sidebarOpen && subscription && (
+          <div className="px-4 py-3 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-500">Account</span>
+              {getTierBadge()}
+            </div>
+          </div>
+        )}
+        {!sidebarOpen && subscription && (
+          <div className="py-3 border-b border-gray-200 flex justify-center">
+            {getTierBadge()}
+          </div>
+        )}
+
         {/* Navigation Links */}
         <nav className="p-4 space-y-2">
           <button
@@ -243,17 +301,6 @@ export default function BillingPage() {
             <Image src="/user-circle.svg" alt="Profile" width={28} height={28} className="object-contain" />
             {sidebarOpen && <span>Profile</span>}
           </button>
-
-          <button
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-              sidebarOpen ? 'justify-start' : 'justify-center'
-            } bg-[#B89A5A]/10 text-[#B89A5A] font-medium`}
-          >
-            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-            </svg>
-            {sidebarOpen && <span>Billing</span>}
-          </button>
         </nav>
 
         {/* Logout Button */}
@@ -298,13 +345,14 @@ export default function BillingPage() {
                 </h1>
               </div>
               
-              {subscription && currentView === 'billing' && (
-                <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3">
+                {subscription && getTierBadge()}
+                {subscription && currentView === 'billing' && (
                   <span className="px-3 py-1.5 bg-green-100 text-green-700 text-sm font-medium rounded-full">
                     {subscription.plan.type === 'lifetime' ? 'Lifetime Member' : 'Active Subscription'}
                   </span>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </header>
